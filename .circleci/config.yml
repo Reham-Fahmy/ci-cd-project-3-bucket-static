@@ -5,18 +5,7 @@ version: 2.1
 # Define a job to be invoked later in a workflow.
 # See: https://circleci.com/docs/2.0/configuration-reference/#jobs
 jobs:
-  say-hello:
-    # Specify the execution environment. You can specify an image from Dockerhub or use one of our Convenience Images from CircleCI's Developer Hub.
-    # See: https://circleci.com/docs/2.0/configuration-reference/#docker-machine-macos-windows-executor
-    docker:
-      - image: cimg/base:stable
-    # Add steps to the job
-    # See: https://circleci.com/docs/2.0/configuration-reference/#steps
-    steps:
-      - checkout
-      - run:
-          name: "Say hello"
-          command: "echo Hello, World!"
+ 
   create_and_deploy_front_end:
       docker:
         - image: amazon/aws-cli
@@ -43,14 +32,49 @@ jobs:
                  --template-file cloudfront.yml \
                 --stack-name production-distro \
                 --parameter-overrides PipelineID="mybucket-${CIRCLE_WORKFLOW_ID:0:7}"
+   get_last_deployment_id:
+        docker:
+           - image: amazon/aws-cli
+        steps:
+           - checkout
+           - run: yum install -y tar gzip
+          - run:
+              name: Fetch and save the old pipeline ID (bucket name) responsible for the last release.
+              command: |
+                  aws cloudformation \
+                   list-exports --query "Exports[?Name==\`PipelineID\`].Value" \
+                   --no-paginate --output text > ~/textfile.txt
+    - persist_to_workspace:
+        root: ~/
+        paths: 
+          - textfile.txt 
+   clean_up_old_front_end:
+          docker:
+            - image: amazon/aws-cli
+         steps:
+            - checkout
+            - run: yum install -y tar gzip
+            - attach_workspace:
+               at: ~/
+           - run:
+                name: Destroy the previous S3 bucket and CloudFormation stack. 
+               # Use $OldBucketID environment variable or mybucket644752792305 below.
+               # Similarly, you can create and use $OldStackID environment variable in place of production-distro 
+               command: |
+                  export OldBucketID=$(cat ~/textfile.txt)
+                  aws s3 rm "s3://${OldBucketID}" --recursive
 
 # Invoke jobs via workflows
 # See: https://circleci.com/docs/2.0/configuration-reference/#workflows
 workflows:
-  say-hello-workflow:
-    jobs:
-      - say-hello
-      - create_and_deploy_front_end
-      - promote_to_production :
-         requires: 
+  my_workflow:
+      jobs:
+        - create_and_deploy_front_end
+        - promote_to_production:
+            requires: 
               - create_and_deploy_front_end
+        - get_last_deployment_id
+        - clean_up_old_front_end:
+            requires:
+              - get_last_deployment_id
+              - promote_to_production
