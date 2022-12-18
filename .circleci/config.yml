@@ -38,7 +38,7 @@ jobs:
         - checkout
         - run:
            name: Execute cloudfront.yml
-            command: |
+           command: |
                aws cloudformation deploy \
                  --template-file cloudfront.yml \
                 --stack-name production-distro \
