@@ -20,7 +20,7 @@ jobs:
             --parameter-overrides MyBucketName="mybucket-${CIRCLE_WORKFLOW_ID:0:7}"
  # Uncomment the step below if yoou wish to upload all contents of the current directory to the S3 bucket
        - run: aws s3 sync . s3://mybucket-${CIRCLE_WORKFLOW_ID:0:7} --delete
-   promote_to_production:
+  promote_to_production:
       docker:
         - image: amazon/aws-cli
       steps:
@@ -32,7 +32,7 @@ jobs:
                  --template-file cloudfront.yml \
                 --stack-name production-distro \
                 --parameter-overrides PipelineID="mybucket-${CIRCLE_WORKFLOW_ID:0:7}"
-   get_last_deployment_id:
+  get_last_deployment_id:
         docker:
            - image: amazon/aws-cli
         steps:
@@ -48,10 +48,10 @@ jobs:
              root: ~/
              paths: 
                - textfile.txt 
-     clean_up_old_front_end:
+  clean_up_old_front_end:
           docker:
             - image: amazon/aws-cli
-         steps:
+          steps:
             - checkout
             - run: yum install -y tar gzip
             - attach_workspace:
@@ -60,10 +60,9 @@ jobs:
                 name: Destroy the previous S3 bucket and CloudFormation stack. 
                # Use $OldBucketID environment variable or mybucket644752792305 below.
                # Similarly, you can create and use $OldStackID environment variable in place of production-distro 
-               command: |
+                command: |
                   export OldBucketID=$(cat ~/textfile.txt)
                   aws s3 rm "s3://${OldBucketID}" --recursive
-
 # Invoke jobs via workflows
 # See: https://circleci.com/docs/2.0/configuration-reference/#workflows
 workflows:
